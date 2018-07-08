@@ -16,7 +16,7 @@ RSpec.describe LxdClient::Error do
     end
 
     it "displays the error message" do 
-      expect(error.message).to eq("Received response with error_code 500 : 'Failed to retrieve profile='nonexistent_profile''")
+      expect(error.message).to eq("Received response with error_code 500 : Failed to retrieve profile='nonexistent_profile'")
     end
   end
 end

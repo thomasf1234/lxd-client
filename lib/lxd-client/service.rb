@@ -7,7 +7,7 @@ module LxdClient
       @options = options
     end
 
-     ############### Containers ###############
+    ############### Containers ###############
 
     def containers
       response = request do |http|
@@ -78,15 +78,20 @@ module LxdClient
     ############### Operations ###############
 
     def operations
-      request do |http|
+      response = request do |http|
         http.get('/1.0/operations', {'Accept' =>'application/json'}) 
       end
+
+      operation_urls = response.body["metadata"]
+      operation_urls.map { |url| File.basename(url) }
     end
 
     def operation(uuid)
-      request do |http|
+      response = request do |http|
         http.get("/1.0/operations/#{uuid}", {'Accept' =>'application/json'}) 
       end
+
+      response.body["metadata"]
     end
 
     def operation_wait(uuid, timeout=30)
@@ -97,15 +102,20 @@ module LxdClient
 
     ############### Profiles ###############
     def profiles
-      request do |http|
+      response = request do |http|
         http.get("/1.0/profiles", {'Accept' =>'application/json'}) 
       end
+
+      profile_urls = response.body["metadata"]
+      profile_urls.map { |url| File.basename(url) }
     end
 
     def profile(name)
-      request do |http|
+      response = request do |http|
         http.get("/1.0/profiles/#{name}", {'Accept' =>'application/json'}) 
       end
+
+      response.body["metadata"]
     end
 
     def profile_create(values_hash)
@@ -117,6 +127,8 @@ module LxdClient
         post.body = body.to_json
         http.request(post)
       end
+
+      nil
     end
 
     def profile_replace(name, values_hash)
@@ -128,6 +140,8 @@ module LxdClient
         put.body = body.to_json
         http.request(put)
       end
+
+      nil
     end
 
     def profile_update(name, values_hash)
@@ -139,6 +153,8 @@ module LxdClient
         patch.body = body.to_json
         http.request(patch)
       end
+
+      nil
     end
 
     def profile_rename(name, new_name)
@@ -150,12 +166,16 @@ module LxdClient
         post.body = body.to_json
         http.request(post)
       end
+
+      nil
     end
 
     def profile_delete(name)
       request do |http|
         http.delete("/1.0/profiles/#{name}", {'Accept' =>'application/json'}) 
       end
+
+      nil
     end
 
     private 
@@ -172,8 +192,9 @@ module LxdClient
             response_id = response.body["metadata"]["id"]
             operation_wait(response_id)
           end
-          
+          require 'pry'; binding.pry
           response
+          
         else
           raise("Unknown response type #{response.body["type"]}")
         end
