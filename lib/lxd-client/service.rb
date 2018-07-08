@@ -2,29 +2,36 @@ require 'net/socket_http'
 
 module LxdClient
   class Service
-    def initialize(socket_path='/var/lib/lxd/unix.socket', options={ "wait" => true })
-      @socket_path = socket_path
+    def initialize(url='unix:///var/lib/lxd/unix.socket', options={ "wait" => true, "read_timeout" => 30 })
+      @url = url
       @options = options
     end
 
      ############### Containers ###############
 
     def containers
-      request do |http|
+      response = request do |http|
         http.get("/1.0/containers", {'Accept' =>'application/json'}) 
       end
+
+      container_urls = response.body["metadata"]
+      container_urls.map { |url| File.basename(url) }
     end
 
     def container(name)
-      request do |http|
+      response = request do |http|
         http.get("/1.0/containers/#{name}", {'Accept' =>'application/json'}) 
       end
+
+      response.body["metadata"]
     end
 
     def container_state(name)
-      request do |http|
+      response = request do |http|
         http.get("/1.0/containers/#{name}/state", {'Accept' =>'application/json'}) 
       end
+
+      response.body["metadata"]
     end
 
     def container_stop(container, stateful=false, force=false, timeout=30)
@@ -153,7 +160,7 @@ module LxdClient
 
     private 
     def request
-      http = Net::SocketHttp.new('', @socket_path)
+      http = get_http(@url)
       raw_response = yield(http)
       response = LxdClient::Response.new(raw_response.code, raw_response.body)
 
@@ -173,6 +180,29 @@ module LxdClient
       else
         raise(LxdClient::Error.new(response))
       end
+    end
+
+    def get_http(url)
+      unix_scheme_regex = /^unix:\/\//
+      http = nil
+
+      if url.match(unix_scheme_regex).nil?
+        uri = URI.parse(url)
+        http = Net::HTTP.new(uri.host, uri.port)
+
+        if uri.kind_of?(URI::HTTPS)
+          http.use_ssl = true
+          http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+        else
+         http.use_ssl = false
+        end  
+      else
+        socket_path = url.split(unix_scheme_regex).last.strip
+        http = Net::SocketHttp.new('', socket_path)
+      end
+
+      http.read_timeout = @options['read_timeout']
+      http
     end
   end
 end

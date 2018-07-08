@@ -2,6 +2,7 @@ ENV['ENV'] ||= 'test'
 Bundler.require(:default, ENV['ENV'])
 require "lxd-client"
 require "support/helpers/unit_helpers"
+require 'webmock/rspec'
 
 RSpec.configure do |config|
   config.color= true
@@ -13,4 +14,8 @@ RSpec.configure do |config|
   config.disable_monkey_patching!
 
   config.include SpecHelper::UnitHelpers
+
+  config.before(:suite) do 
+    WebMock.disable_net_connect!
+  end
 end
