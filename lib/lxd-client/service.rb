@@ -99,6 +99,66 @@ module LxdClient
       end
     end
 
+    ############### Images ###############
+
+    def images
+      response = request do |http|
+        http.get('/1.0/images', {'Accept' =>'application/json'}) 
+      end
+
+      image_urls = response.body["metadata"]
+      image_urls.map { |url| File.basename(url) }
+    end
+
+    def image(fingerprint)
+      response = request do |http|
+        http.get("/1.0/images/#{fingerprint}", {'Accept' =>'application/json'}) 
+      end
+
+      response.body["metadata"]
+    end
+
+    def image_aliases
+      response = request do |http|
+        http.get('/1.0/images/aliases', {'Accept' =>'application/json'}) 
+      end
+
+      image_alias_urls = response.body["metadata"]
+      image_alias_urls.map { |url| File.basename(url) }
+    end
+
+    def image_alias(name)
+      response = request do |http|
+        http.get("/1.0/images/aliases/#{name}", {'Accept' =>'application/json'}) 
+      end
+
+      response.body["metadata"]
+    end
+
+    #def image_upload()
+    #end
+
+    # def image_download(url, filename: nil, is_public: false, properties: {}, aliases: [])
+    #   response = request do |http|
+    #     headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
+    #     body = { 
+    #       filename: filename, 
+    #       public: is_public, 
+    #       properties: properties, 
+    #       aliases: aliases,
+    #       source: {
+    #         type: 'url',
+    #         url: url
+    #       }
+    #     }
+    #     post = Net::HTTP::Post.new("/1.0/images", headers)
+
+    #     post.body = body.to_json
+    #     http.request(post)   
+    #   end
+    # end
+
+
     ############### Operations ###############
 
     def operations
