@@ -2,9 +2,19 @@ require 'net/socket_http'
 
 module LxdClient
   class Service
-    def initialize(url='unix:///var/lib/lxd/unix.socket', options={ "wait" => true, "read_timeout" => 30 })
+    module ContainerActions
+      START = 'start'
+      STOP = 'stop'
+      RESTART = 'restart'
+      FREEZE = 'freeze'
+      UNFREEZE = 'unfreeze'
+    end
+
+    def initialize(url='unix:///var/lib/lxd/unix.socket', async: false, read_timeout: 30, wait_timeout: nil)
       @url = url
-      @options = options
+      @async = async
+      @read_timeout = read_timeout
+      @wait_timeout = wait_timeout
     end
 
     ############### Containers ###############
@@ -34,21 +44,35 @@ module LxdClient
       response.body["metadata"]
     end
 
-    def container_stop(container, stateful=false, force=false, timeout=30)
-      request do |http|
-        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
-        body = { action: 'stop', stateful: stateful, force: force, timeout: timeout }
-        put = Net::HTTP::Put.new("/1.0/containers/#{container}/state", headers)
-
-        put.body = body.to_json
-        http.request(put)
-      end
+    def container_start(container, stateful: false, timeout: nil)
+      container_action(container, ContainerActions::START, stateful: stateful, timeout: timeout)
     end
 
+    def container_restart(container, force: false, timeout: nil)
+      container_action(container, ContainerActions::RESTART, force: force, timeout: timeout)
+    end
+
+    def container_stop(container, stateful: false, force: false, timeout: nil)
+      container_action(container, ContainerActions::STOP, stateful: stateful, force: force, timeout: timeout)
+    end
+
+    def container_freeze(container, timeout: nil)
+      container_action(container, ContainerActions::FREEZE, timeout: timeout)
+    end
+
+    def container_unfreeze(container, timeout: nil)
+      container_action(container, ContainerActions::UNFREEZE, timeout: timeout)
+    end
+
+    ############### Snapshots ###############
+
     def snapshots(container)
-      request do |http|
+      response = request do |http|
         http.get("/1.0/containers/#{container}/snapshots", {'Accept' =>'application/json'}) 
       end
+
+      snapshot_urls = response.body["metadata"]
+      snapshot_urls.map { |url| File.basename(url) }
     end
 
     def snapshot(container, snapshot)
@@ -58,7 +82,7 @@ module LxdClient
     end
     
     #stateful is broken
-    def snapshot_create(container, snapshot_name, stateful=false)
+    def snapshot_create(container, snapshot_name, stateful: false)
       request do |http|
         headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
         body = { name: snapshot_name, stateful: stateful }
@@ -94,7 +118,7 @@ module LxdClient
       response.body["metadata"]
     end
 
-    def operation_wait(uuid, timeout=nil)
+    def operation_wait(uuid, timeout: nil)
       request do |http|
         endpoint = "/1.0/operations/#{uuid}/wait"
         
@@ -184,6 +208,18 @@ module LxdClient
       nil
     end
 
+    protected
+    def container_action(container, action, stateful: false, force: false, timeout: nil)
+      request do |http|
+        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
+        body = { action: action, stateful: stateful, force: force, timeout: timeout }
+        put = Net::HTTP::Put.new("/1.0/containers/#{container}/state", headers)
+
+        put.body = body.to_json
+        http.request(put)
+      end
+    end
+
     private 
     def request
       http = get_http(@url)
@@ -194,11 +230,10 @@ module LxdClient
         if response.sync?
           response
         elsif response.async?
-          if @options["wait"] == true
+          unless @async == true
             response_id = response.body["metadata"]["id"]
-            operation_wait(response_id)
+            operation_wait(response_id, timeout: @wait_timeout)
           end
-          require 'pry'; binding.pry
           response
           
         else
@@ -228,7 +263,7 @@ module LxdClient
         http = Net::SocketHttp.new('', socket_path)
       end
 
-      http.read_timeout = @options['read_timeout']
+      http.read_timeout = @read_timeout
       http
     end
   end

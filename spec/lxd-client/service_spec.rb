@@ -169,6 +169,32 @@ RSpec.describe LxdClient::Service do
     end
   end
 
+  ############### Snapshots ###############
+
+  describe "snapshots" do 
+    let(:response_code) { 200 }
+    let(:response_body) do
+       "{\"type\":\"sync\",\"status\":\"Success\",\"status_code\":200,\"operation\":\"\",\"error_code\":0,\"error\":\"\",\"metadata\":#{snapshots.to_json}}" 
+    end
+    let(:snapshots) do 
+      [
+        "/1.0/containers/mycont/snapshots/first",
+        "/1.0/containers/mycont/snapshots/second"
+      ]
+    end
+
+    before(:each) do
+      stub_request(:get, "http://localhost.lxd/1.0/containers/mycont/snapshots").to_return(
+        body: response_body, 
+        status: response_code
+      )
+    end
+    
+    it "returns the snapshots" do 
+      expect(service.snapshots('mycont')).to match_array(["first", "second"])
+    end
+  end
+
   ############### Operations ###############
 
   describe "operations" do 
