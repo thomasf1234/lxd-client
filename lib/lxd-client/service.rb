@@ -94,9 +94,15 @@ module LxdClient
       response.body["metadata"]
     end
 
-    def operation_wait(uuid, timeout=30)
+    def operation_wait(uuid, timeout=nil)
       request do |http|
-        http.get("/1.0/operations/#{uuid}/wait?timeout=#{timeout}", {'Accept' =>'application/json'}) 
+        endpoint = "/1.0/operations/#{uuid}/wait"
+        
+        if !timeout.nil? 
+          endpoint += "?timeout=#{timeout}"
+        end
+
+        http.get(endpoint, {'Accept' =>'application/json'}) 
       end
     end
 
