@@ -20,27 +20,18 @@ module LxdClient
     ############### Containers ###############
 
     def containers
-      response = request do |http|
-        http.get("/1.0/containers", {'Accept' =>'application/json'}) 
-      end
-
+      response = get("/1.0/containers")
       container_urls = response.body["metadata"]
       container_urls.map { |url| File.basename(url) }
     end
 
     def container(name)
-      response = request do |http|
-        http.get("/1.0/containers/#{name}", {'Accept' =>'application/json'}) 
-      end
-
+      response = get("/1.0/containers/#{name}")
       response.body["metadata"]
     end
 
     def container_state(name)
-      response = request do |http|
-        http.get("/1.0/containers/#{name}/state", {'Accept' =>'application/json'}) 
-      end
-
+      response = get("/1.0/containers/#{name}/state")
       response.body["metadata"]
     end
 
@@ -67,18 +58,13 @@ module LxdClient
     ############### Snapshots ###############
 
     def snapshots(container)
-      response = request do |http|
-        http.get("/1.0/containers/#{container}/snapshots", {'Accept' =>'application/json'}) 
-      end
-
+      response = get("/1.0/containers/#{container}/snapshots")
       snapshot_urls = response.body["metadata"]
       snapshot_urls.map { |url| File.basename(url) }
     end
 
     def snapshot(container, snapshot)
-      request do |http|
-        http.get("/1.0/containers/#{container}/snapshots/#{snapshot}", {'Accept' =>'application/json'}) 
-      end
+      get("/1.0/containers/#{container}/snapshots/#{snapshot}")
     end
     
     #stateful is broken
@@ -94,35 +80,20 @@ module LxdClient
     end
 
     def snapshot_delete(container, snapshot)
-      request do |http|
-        http.delete("/1.0/containers/#{container}/snapshots/#{snapshot}", {'Accept' =>'application/json'}) 
-      end
+      delete("/1.0/containers/#{container}/snapshots/#{snapshot}")
     end
 
     ############### Images ###############
 
     def images
-      response = request do |http|
-        http.get('/1.0/images', {'Accept' =>'application/json'}) 
-      end
-
+      response = get('/1.0/images')
       image_urls = response.body["metadata"]
       image_urls.map { |url| File.basename(url) }
     end
 
     def image(fingerprint)
-      response = request do |http|
-        http.get("/1.0/images/#{fingerprint}", {'Accept' =>'application/json'}) 
-      end
-
+      response = get("/1.0/images/#{fingerprint}")
       response.body["metadata"]
-    end
-
-    #convenience api extension
-    def image_for_alias(alias_name)
-      _image_alias = image_alias(alias_name)
-      fingerprint = _image_alias["target"]
-      image(fingerprint)
     end
 
     def image_upload(path, sha256: nil, filename: nil, is_public: false, properties: {})
@@ -148,186 +119,144 @@ module LxdClient
     ############### Image Aliases ###############
 
     def image_aliases
-      response = request do |http|
-        http.get('/1.0/images/aliases', {'Accept' =>'application/json'}) 
-      end
-
+      response = get('/1.0/images/aliases')
       image_alias_urls = response.body["metadata"]
       image_alias_urls.map { |url| File.basename(url) }
     end
 
     def image_alias(name)
-      response = request do |http|
-        http.get("/1.0/images/aliases/#{name}", {'Accept' =>'application/json'}) 
-      end
-
+      response = get("/1.0/images/aliases/#{name}")
       response.body["metadata"]
     end
 
-    def image_alias_create(name, fingerprint, description)
-      response = request do |http|
-        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
-        body = { name: name, target: fingerprint, description: description }
-        post = Net::HTTP::Post.new("/1.0/images/aliases", headers)
-        post.body = body.to_json
-        http.request(post)
-      end
-
-      response.body["metadata"]
+    def image_alias_create(name, values_hash)
+      create("/1.0/images/aliases", values_hash)
     end
 
-    def image_alias_replace(name, target, description)
-      response = request do |http|
-        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
-        body = { target: target, description: description }
-        put = Net::HTTP::Put.new("/1.0/images/aliases/#{name}", headers)
-        put.body = body.to_json
-        http.request(put)
-      end
-
-      response.body["metadata"]
+    def image_alias_replace(name, values_hash)
+      replace("/1.0/images/aliases/#{name}", values_hash)
     end
 
-    def image_alias_update(name, options={})
-      response = request do |http|
-        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
-        body = options.slice(:target, :description)
-        patch = Net::HTTP::Patch.new("/1.0/images/aliases/#{name}", headers)
-        patch.body = body.to_json
-        http.request(patch)
-      end
-
-      response.body["metadata"]
+    def image_alias_update(name, values_hash)
+      update("/1.0/images/aliases/#{name}", values_hash)
     end
 
     def image_alias_rename(name, new_name)
+      rename("/1.0/images/aliases/#{name}", new_name)
+    end
+
+    def image_alias_delete(name)
+      delete("/1.0/images/aliases/#{name}")
+    end
+    
+    ############### Networks ###############
+
+    def networks
+      response = get('/1.0/networks')
+      network_urls = response.body["metadata"]
+      network_urls.map { |url| File.basename(url) }
+    end
+
+    #   {
+    #     "name": "lxdbr1",
+    #     "description": "My network",
+    #     "config": {
+    #         "ipv4.address": "10.207.129.1/24",
+    #         "ipv4.nat": "true",
+    #         "ipv6.address": "2001:470:b368:4242::1/64",
+    #         "ipv6.nat": "true"
+    #     }
+    # }
+    def network_create(values_hash)
+      create("/1.0/networks", values_hash)
+    end
+
+    def network(name)
       response = request do |http|
-        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
-        body = { name: new_name }
-        post = Net::HTTP::Post.new("/1.0/images/aliases/#{name}", headers)
-        post.body = body.to_json
-        http.request(post)
+        http.get("/1.0/networks/#{name}", {'Accept' =>'application/json'}) 
       end
 
       response.body["metadata"]
     end
 
-    def image_alias_delete(name)
-      response = request do |http|
-        headers = { 'Accept' =>'application/json' }
-        http.delete("/1.0/images/aliases/#{name}", headers) 
-      end
+    def network_replace(name, values_hash)
+      replace("/1.0/networks/#{name}", values_hash)
+    end
 
-      response.body["metadata"]
+    #doesn't work v3.0.1
+    def network_update(name, values_hash)
+      update("/1.0/networks/#{name}", values_hash)
+    end
+
+    def network_rename(name, new_name)
+      rename("/1.0/networks/#{name}", new_name)
+    end
+
+    def network_delete(name)
+      delete("/1.0/networks/#{name}")
     end
 
     ############### Operations ###############
 
     def operations
-      response = request do |http|
-        http.get('/1.0/operations', {'Accept' =>'application/json'}) 
-      end
-
+      response = get('/1.0/operations')
       operation_urls = response.body["metadata"]
       operation_urls.map { |url| File.basename(url) }
     end
 
     def operation(uuid)
-      response = request do |http|
-        http.get("/1.0/operations/#{uuid}", {'Accept' =>'application/json'}) 
-      end
-
+      response = get("/1.0/operations/#{uuid}")
       response.body["metadata"]
     end
 
     def operation_wait(uuid, timeout: nil)
-      request do |http|
-        endpoint = "/1.0/operations/#{uuid}/wait"
+      endpoint = "/1.0/operations/#{uuid}/wait"
         
-        if !timeout.nil? 
-          endpoint += "?timeout=#{timeout}"
-        end
-
-        http.get(endpoint, {'Accept' =>'application/json'}) 
+      if !timeout.nil? 
+        endpoint += "?timeout=#{timeout}"
       end
+
+      get(endpoint)  
     end
 
     ############### Profiles ###############
     def profiles
-      response = request do |http|
-        http.get("/1.0/profiles", {'Accept' =>'application/json'}) 
-      end
-
+      response = get("/1.0/profiles")
       profile_urls = response.body["metadata"]
       profile_urls.map { |url| File.basename(url) }
     end
 
     def profile(name)
-      response = request do |http|
-        http.get("/1.0/profiles/#{name}", {'Accept' =>'application/json'}) 
-      end
-
+      response = get("/1.0/profiles/#{name}")
       response.body["metadata"]
     end
 
     def profile_create(values_hash)
-      request do |http|
-        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
-        body = values_hash
-        post = Net::HTTP::Post.new("/1.0/profiles", headers)
-
-        post.body = body.to_json
-        http.request(post)
-      end
-
-      nil
+      create("/1.0/profiles", values_hash)
     end
 
     def profile_replace(name, values_hash)
-      request do |http|
-        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
-        body = values_hash
-        put = Net::HTTP::Put.new("/1.0/profiles/#{name}", headers)
-
-        put.body = body.to_json
-        http.request(put)
-      end
-
-      nil
+      replace("/1.0/profiles/#{name}", values_hash)
     end
 
     def profile_update(name, values_hash)
-      request do |http|
-        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
-        body = values_hash
-        patch = Net::HTTP::Patch.new("/1.0/profiles/#{name}", headers)
-
-        patch.body = body.to_json
-        http.request(patch)
-      end
-
-      nil
+      update("/1.0/profiles/#{name}", values_hash)
     end
 
     def profile_rename(name, new_name)
-      request do |http|
-        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
-        body = { name: new_name }
-        post = Net::HTTP::Post.new("/1.0/profiles/#{name}", headers)
-
-        post.body = body.to_json
-        http.request(post)
-      end
-
-      nil
+      rename("/1.0/profiles/#{name}", new_name)
     end
 
     def profile_delete(name)
-      request do |http|
-        http.delete("/1.0/profiles/#{name}", {'Accept' =>'application/json'}) 
-      end
+      delete("/1.0/profiles/#{name}")
+    end
 
-      nil
+    ############### Convenience Extension ###############
+
+    def image_for_alias(alias_name)
+      _image_alias = image_alias(alias_name)
+      fingerprint = _image_alias["target"]
+      image(fingerprint)
     end
 
     protected
@@ -343,6 +272,62 @@ module LxdClient
     end
 
     private 
+    def get(endpoint)
+      request do |http|
+        http.get(endpoint, {'Accept' =>'application/json'}) 
+      end
+    end
+
+    def create(endpoint, values_hash)
+      request do |http|
+        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
+        body = values_hash
+        post = Net::HTTP::Post.new(endpoint, headers)
+
+        post.body = body.to_json
+        http.request(post)
+      end
+    end
+
+    def replace(endpoint, values_hash)
+      request do |http|
+        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
+        body = values_hash
+        put = Net::HTTP::Put.new(endpoint, headers)
+
+        put.body = body.to_json
+        http.request(put)
+      end
+    end
+
+    def update(endpoint, values_hash)
+      request do |http|
+        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
+        body = values_hash
+        patch = Net::HTTP::Patch.new(endpoint, headers)
+
+        patch.body = body.to_json
+        http.request(patch)
+      end
+    end
+
+    def rename(endpoint, new_name)
+      request do |http|
+        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
+        body = { name: new_name }
+        post = Net::HTTP::Post.new(endpoint, headers)
+
+        post.body = body.to_json
+        http.request(post)
+      end
+    end
+
+    def delete(endpoint)
+      response = request do |http|
+        http.delete(endpoint, {'Accept' =>'application/json'}) 
+      end
+    end
+
     def request
       http = get_http(@url)
       raw_response = yield(http)
