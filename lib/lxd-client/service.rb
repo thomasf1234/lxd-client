@@ -118,6 +118,13 @@ module LxdClient
       response.body["metadata"]
     end
 
+    #convenience api extension
+    def image_for_alias(alias_name)
+      _image_alias = image_alias(alias_name)
+      fingerprint = _image_alias["target"]
+      image(fingerprint)
+    end
+
     def image_upload(path, sha256: nil, filename: nil, is_public: false, properties: {})
       response = request do |http|
         if !File.file?(path) 
@@ -164,6 +171,51 @@ module LxdClient
         post = Net::HTTP::Post.new("/1.0/images/aliases", headers)
         post.body = body.to_json
         http.request(post)
+      end
+
+      response.body["metadata"]
+    end
+
+    def image_alias_replace(name, target, description)
+      response = request do |http|
+        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
+        body = { target: target, description: description }
+        put = Net::HTTP::Put.new("/1.0/images/aliases/#{name}", headers)
+        put.body = body.to_json
+        http.request(put)
+      end
+
+      response.body["metadata"]
+    end
+
+    def image_alias_update(name, options={})
+      response = request do |http|
+        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
+        body = options.slice(:target, :description)
+        patch = Net::HTTP::Patch.new("/1.0/images/aliases/#{name}", headers)
+        patch.body = body.to_json
+        http.request(patch)
+      end
+
+      response.body["metadata"]
+    end
+
+    def image_alias_rename(name, new_name)
+      response = request do |http|
+        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
+        body = { name: new_name }
+        post = Net::HTTP::Post.new("/1.0/images/aliases/#{name}", headers)
+        post.body = body.to_json
+        http.request(post)
+      end
+
+      response.body["metadata"]
+    end
+
+    def image_alias_delete(name)
+      response = request do |http|
+        headers = { 'Accept' =>'application/json' }
+        http.delete("/1.0/images/aliases/#{name}", headers) 
       end
 
       response.body["metadata"]
