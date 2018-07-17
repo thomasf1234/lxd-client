@@ -251,12 +251,33 @@ module LxdClient
       delete("/1.0/profiles/#{name}")
     end
 
+    ############### Resources ###############
+
+    def resources
+      response = get("/1.0/resources")
+      response.body["metadata"]
+    end
+
     ############### Convenience Extension ###############
 
     def image_for_alias(alias_name)
       _image_alias = image_alias(alias_name)
       fingerprint = _image_alias["target"]
       image(fingerprint)
+    end
+
+    def logical_core_count
+      _resources = resources
+      _resources['cpu']['total'].to_i  
+    end
+
+    def available_ram_mb
+      _resources = resources
+      total = _resources['memory']['total'].to_i  
+      used = _resources['memory']['used'].to_i
+
+      one_mb = 1024.0 * 1024.0
+      (total - used) / one_mb
     end
 
     protected
