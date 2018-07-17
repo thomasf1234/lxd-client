@@ -118,6 +118,28 @@ module LxdClient
       response.body["metadata"]
     end
 
+    def image_upload(path, sha256: nil, filename: nil, is_public: false, properties: {})
+      response = request do |http|
+        if !File.file?(path) 
+          raise ArgumentError.new("File #{path} not found")
+        end
+
+        headers = { "Content-Type" => "application/octet-stream" }
+
+        headers["X-LXD-fingerprint"] = sha256
+        headers["X-LXD-filename"] = filename if !filename.nil?
+        headers["X-LXD-public"] = (is_public == true).to_s
+        headers["X-LXD-properties"] = URI.encode_www_form(properties) if !properties.empty?
+    
+        post = Net::HTTP::Post.new("/1.0/images", headers)
+        file_content = File.read(path)
+        post.body = file_content
+        http.request(post) 
+      end 
+    end
+
+    ############### Image Aliases ###############
+
     def image_aliases
       response = request do |http|
         http.get('/1.0/images/aliases', {'Accept' =>'application/json'}) 
@@ -135,29 +157,17 @@ module LxdClient
       response.body["metadata"]
     end
 
-    #def image_upload()
-    #end
+    def image_alias_create(name, fingerprint, description)
+      response = request do |http|
+        headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
+        body = { name: name, target: fingerprint, description: description }
+        post = Net::HTTP::Post.new("/1.0/images/aliases", headers)
+        post.body = body.to_json
+        http.request(post)
+      end
 
-    # def image_download(url, filename: nil, is_public: false, properties: {}, aliases: [])
-    #   response = request do |http|
-    #     headers = {'Accept' =>'application/json', 'Content-Type' => 'application/json'}
-    #     body = { 
-    #       filename: filename, 
-    #       public: is_public, 
-    #       properties: properties, 
-    #       aliases: aliases,
-    #       source: {
-    #         type: 'url',
-    #         url: url
-    #       }
-    #     }
-    #     post = Net::HTTP::Post.new("/1.0/images", headers)
-
-    #     post.body = body.to_json
-    #     http.request(post)   
-    #   end
-    # end
-
+      response.body["metadata"]
+    end
 
     ############### Operations ###############
 
@@ -292,7 +302,12 @@ module LxdClient
         elsif response.async?
           unless @async == true
             response_id = response.body["metadata"]["id"]
-            operation_wait(response_id, timeout: @wait_timeout)
+            operation_response = operation_wait(response_id, timeout: @wait_timeout)
+            operation_status_code = operation_response.body["metadata"]["status_code"]
+            
+            if LxdClient::Response::ERROR_HTTP_RESPONSE_CODES.include?(operation_status_code.to_s)
+              raise(LxdClient::Error.new(operation_response))
+            end
           end
           response
           
