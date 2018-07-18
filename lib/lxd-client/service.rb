@@ -17,6 +17,28 @@ module LxdClient
       @wait_timeout = wait_timeout
     end
 
+    ############### API ###############
+
+    def api
+      response = get("/")
+      response.body["metadata"]
+    end
+
+    ############### Configuration ###############
+    
+    def config
+      response = get("/1.0")
+      response.body["metadata"]
+    end
+    
+    def config_replace(values_hash)
+      replace("/1.0", values_hash)
+    end
+    
+    def config_update(values_hash)
+      update("/1.0", values_hash)
+    end
+
     ############### Containers ###############
 
     def containers
@@ -172,10 +194,7 @@ module LxdClient
     end
 
     def network(name)
-      response = request do |http|
-        http.get("/1.0/networks/#{name}", {'Accept' =>'application/json'}) 
-      end
-
+      response = get("/1.0/networks/#{name}")
       response.body["metadata"]
     end
 
@@ -226,13 +245,13 @@ module LxdClient
       profile_urls.map { |url| File.basename(url) }
     end
 
+    def profile_create(values_hash)
+      create("/1.0/profiles", values_hash)
+    end
+
     def profile(name)
       response = get("/1.0/profiles/#{name}")
       response.body["metadata"]
-    end
-
-    def profile_create(values_hash)
-      create("/1.0/profiles", values_hash)
     end
 
     def profile_replace(name, values_hash)
@@ -251,7 +270,50 @@ module LxdClient
       delete("/1.0/profiles/#{name}")
     end
 
-    ############### Resources ###############
+    ############### Storage-Pools ###############
+
+    def storage_pools
+      response = get("/1.0/storage-pools")
+      storage_pools_urls = response.body["metadata"]
+      storage_pools_urls.map { |url| File.basename(url) }
+    end
+
+    def storage_pool_create(values_hash)
+      create("/1.0/storage-pools", values_hash)
+    end
+
+    def storage_pool(name)
+      response = get("/1.0/storage-pools/#{name}")
+      response.body["metadata"]
+    end
+
+    def storage_pool_replace(name, values_hash)
+      replace("/1.0/storage-pools/#{name}", values_hash)
+    end
+
+    def storage_pool_update(name, values_hash)
+      update("/1.0/storage-pools/#{name}", values_hash)
+    end
+
+    def storage_pool_delete(name)
+      delete("/1.0/storage-pools/#{name}")
+    end
+
+    def storage_pool_resources(name)
+      response = get("/1.0/storage-pools/#{name}/resources")
+      response.body["metadata"]
+    end
+
+    def storage_pool_volumes(name)
+      response = get("/1.0/storage-pools/#{name}/volumes")
+      response.body["metadata"]
+    end
+
+    def storage_pool_volume_create(name, values_hash)
+      create("/1.0/storage-pools/#{name}/volumes", values_hash)
+    end
+
+    ############### Resources ############### 
 
     def resources
       response = get("/1.0/resources")
