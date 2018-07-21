@@ -39,6 +39,13 @@ module LxdClient
       update("/1.0", values_hash)
     end
 
+    ############### Certificates ###############
+
+    def certificates
+      response = get("/1.0/certificates")
+      response.body["metadata"]
+    end
+
     ############### Containers ###############
 
     def containers
@@ -136,6 +143,10 @@ module LxdClient
         post.body = file_content
         http.request(post) 
       end 
+    end
+
+    def image_delete(fingerprint)
+      delete("/1.0/images/#{fingerprint}")
     end
 
     ############### Image Aliases ###############
