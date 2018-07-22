@@ -80,9 +80,18 @@ module LxdClient
       container_urls.map { |url| File.basename(url) }
     end
 
+    def container_create(values_hash)
+      response = post("/1.0/containers/")
+      response.body["metadata"]
+    end
+    
     def container(name)
       response = get("/1.0/containers/#{name}")
       response.body["metadata"]
+    end
+
+    def container_delete(name)
+      delete("/1.0/containers/#{name}")
     end
 
     def container_state(name)
@@ -194,7 +203,7 @@ module LxdClient
       response.body["metadata"]
     end
 
-    def image_alias_create(name, values_hash)
+    def image_alias_create(values_hash)
       create("/1.0/images/aliases", values_hash)
     end
 
