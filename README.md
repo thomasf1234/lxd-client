@@ -22,7 +22,17 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+```
+require 'lxd-client'
+
+> lxc = LxdClient::Service.new('https://192.168.20.26:8443', client_key: '/home/myuser/.ssl/lxc-client.key', client_cert: '/home/myuser/.ssl/lxc-client.crt')
+
+> lxc.certificates
+ => ["/1.0/certificates/284694ef9d0bc86c43a80c13dc5cda4df111894265fb39e937d3b13c1abee7ed"]
+> lxc.images
+
+
+```
 
 ## Development
 
@@ -37,3 +47,4 @@ Bug reports and pull requests are welcome on GitHub at https://github.com/[USERN
 ## License
 
 The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
+

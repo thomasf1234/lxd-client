@@ -1,4 +1,7 @@
 require 'net/socket_http'
+require 'openssl'
+require 'socket'
+require 'base64'
 
 module LxdClient
   class Service
@@ -10,11 +13,13 @@ module LxdClient
       UNFREEZE = 'unfreeze'
     end
 
-    def initialize(url='unix:///var/lib/lxd/unix.socket', async: false, read_timeout: 30, wait_timeout: nil)
+    def initialize(url='unix:///var/lib/lxd/unix.socket', async: false, read_timeout: 30, wait_timeout: nil, client_key: nil, client_cert: nil)
       @url = url
       @async = async
       @read_timeout = read_timeout
       @wait_timeout = wait_timeout
+      @client_key = client_key
+      @client_cert = client_cert
     end
 
     ############### API ###############
@@ -43,6 +48,27 @@ module LxdClient
 
     def certificates
       response = get("/1.0/certificates")
+      response.body["metadata"]
+    end
+
+    def certificate_create(cert_path, password, name: Socket.gethostname)
+      if !File.file?(cert_path) 
+        raise ArgumentError.new("File #{cert_path} not found")
+      end
+
+      cert_raw = File.read(cert_path)
+      values_hash = {
+        name: name,
+        type: 'client',
+        certificate: Base64.strict_encode64(OpenSSL::X509::Certificate.new(cert_raw).to_der),
+        password: password
+      }
+
+      create("/1.0/certificates", values_hash)
+    end
+
+    def certificate(fingerprint)
+      response = get("/1.0/certificates/#{fingerprint}")
       response.body["metadata"]
     end
 
@@ -131,17 +157,23 @@ module LxdClient
           raise ArgumentError.new("File #{path} not found")
         end
 
-        headers = { "Content-Type" => "application/octet-stream" }
+        headers = { }
+
+        #for streamed uploads, must send Content-Length and Transfer-Encoding as 'chunked'
+        headers["Content-Type"] = "application/octet-stream"
+        headers["Content-Length"] = File.stat(path).size.to_s
+        headers["Transfer-Encoding"] = 'chunked'
 
         headers["X-LXD-fingerprint"] = sha256
         headers["X-LXD-filename"] = filename if !filename.nil?
         headers["X-LXD-public"] = (is_public == true).to_s
         headers["X-LXD-properties"] = URI.encode_www_form(properties) if !properties.empty?
-    
+            
+        #must stream file upload: 
         post = Net::HTTP::Post.new("/1.0/images", headers)
-        file_content = File.read(path)
-        post.body = file_content
-        http.request(post) 
+        post.body_stream = File.open(path, 'r')
+
+        http.request(post)
       end 
     end
 
@@ -461,6 +493,8 @@ module LxdClient
         if uri.kind_of?(URI::HTTPS)
           http.use_ssl = true
           http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+          http.cert = OpenSSL::X509::Certificate.new(File.read(@client_cert))
+          http.key = OpenSSL::PKey::RSA.new(File.read(@client_key))
         else
          http.use_ssl = false
         end  
