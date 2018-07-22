@@ -81,10 +81,10 @@ module LxdClient
     end
 
     def container_create(values_hash)
-      response = post("/1.0/containers/")
+      response = create("/1.0/containers/")
       response.body["metadata"]
     end
-    
+
     def container(name)
       response = get("/1.0/containers/#{name}")
       response.body["metadata"]
