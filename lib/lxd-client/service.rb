@@ -136,8 +136,8 @@ module LxdClient
         headers["Content-Length"] = File.stat(local_path).size.to_s
         headers["Transfer-Encoding"] = 'chunked'
 
-        headers["X-LXD-uid"] = '0'
-        headers["X-LXD-gid"] = '0'
+        headers["X-LXD-uid"] = uid
+        headers["X-LXD-gid"] = gid
         headers["X-LXD-mode"] = mode.rjust(4, '0')
         headers["X-LXD-type"] = 'file'
         headers["X-LXD-write"] = write if !write.nil?
@@ -158,8 +158,8 @@ module LxdClient
 
         headers = { }
 
-        headers["X-LXD-uid"] = '0'
-        headers["X-LXD-gid"] = '0'
+        headers["X-LXD-uid"] = uid
+        headers["X-LXD-gid"] = gid
         headers["X-LXD-mode"] = mode.rjust(4, '0')
         headers["X-LXD-type"] = 'directory'
             
