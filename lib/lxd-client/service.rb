@@ -119,6 +119,57 @@ module LxdClient
       container_action(container, ContainerActions::UNFREEZE, timeout: timeout)
     end
 
+    def container_file(name, path)
+      get("/1.0/containers/#{name}/files?path=#{path}")
+    end
+
+    def container_file_upload(name, local_path, container_path, uid: '0', gid: '0', mode: '644', write: nil)
+      response = request do |http|
+        if !File.file?(local_path) 
+          raise ArgumentError.new("File #{local_path} not found")
+        end
+
+        headers = { }
+
+        #for streamed uploads, must send Content-Length and Transfer-Encoding as 'chunked'
+        headers["Content-Type"] = "application/octet-stream"
+        headers["Content-Length"] = File.stat(local_path).size.to_s
+        headers["Transfer-Encoding"] = 'chunked'
+
+        headers["X-LXD-uid"] = '0'
+        headers["X-LXD-gid"] = '0'
+        headers["X-LXD-mode"] = mode.rjust(4, '0')
+        headers["X-LXD-type"] = 'file'
+        headers["X-LXD-write"] = write if !write.nil?
+            
+        #must stream file upload: 
+        post = Net::HTTP::Post.new("/1.0/containers/#{name}/files?path=#{container_path}", headers)
+        post.body_stream = File.open(local_path, 'r')
+        
+        http.request(post)
+      end 
+    end
+
+    def container_directory_upload(name, local_path, container_path, uid: '0', gid: '0', mode: '755')
+      response = request do |http|
+        if !File.directory?(local_path) 
+          raise ArgumentError.new("Directory #{local_path} not found")
+        end
+
+        headers = { }
+
+        headers["X-LXD-uid"] = '0'
+        headers["X-LXD-gid"] = '0'
+        headers["X-LXD-mode"] = mode.rjust(4, '0')
+        headers["X-LXD-type"] = 'directory'
+            
+        #must stream file upload: 
+        post = Net::HTTP::Post.new("/1.0/containers/#{name}/files?path=#{container_path}", headers)
+        
+        http.request(post)
+      end 
+    end
+
     ############### Snapshots ###############
 
     def snapshots(container)
@@ -394,6 +445,24 @@ module LxdClient
       (total - used) / one_mb
     end
 
+    def container_recursive_upload(container_name, local_path, container_path, uid: '0', gid: '0', mode: '644')
+      if !File.directory?(local_path) 
+        raise ArgumentError.new("Directory #{local_path} not found")
+      end
+
+      container_directory_upload(container_name, local_path, container_path)
+      (Dir.entries(local_path) - ['.', '..']).each do |filename|
+        subfile_path = File.join(local_path, filename)
+        subcontainer_path = File.join(container_path, filename)
+
+        if File.directory?(subfile_path)
+          container_recursive_upload(container_name, subfile_path, subcontainer_path, uid: uid, gid: gid)
+        else
+          container_file_upload(container_name, subfile_path, subcontainer_path, uid: uid, gid: gid, mode: mode)
+        end
+      end
+    end
+
     protected
     def container_action(container, action, stateful: false, force: false, timeout: nil)
       request do |http|
@@ -514,6 +583,10 @@ module LxdClient
 
       http.read_timeout = @read_timeout
       http
+    end
+
+    def file_octal_permissions(path)
+      sprintf("%o", File.stat('README.md').mode)[-4..-1]
     end
   end
 end
