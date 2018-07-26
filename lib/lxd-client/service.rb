@@ -90,6 +90,10 @@ module LxdClient
       response.body["metadata"]
     end
 
+    def container_rename(name, new_name)
+      rename("/1.0/containers/#{name}", new_name)
+    end
+
     def container_delete(name)
       delete("/1.0/containers/#{name}")
     end
