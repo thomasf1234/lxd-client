@@ -2,6 +2,7 @@ require 'net/socket_http'
 require 'openssl'
 require 'socket'
 require 'base64'
+require 'zlib'
 
 module LxdClient
   class Service
@@ -12,6 +13,8 @@ module LxdClient
       FREEZE = 'freeze'
       UNFREEZE = 'unfreeze'
     end
+
+    attr_reader :url
 
     def initialize(url='unix:///var/lib/lxd/unix.socket', async: false, read_timeout: 30, wait_timeout: nil, client_key: nil, client_cert: nil)
       @url = url
@@ -123,8 +126,15 @@ module LxdClient
       container_action(container, ContainerActions::UNFREEZE, timeout: timeout)
     end
 
-    def container_file(name, path)
-      get("/1.0/containers/#{name}/files?path=#{path}")
+    def container_file(name, path)      
+      http = get_http(@url)
+      raw_response = http.get("/1.0/containers/#{name}/files?path=#{path}")
+      
+      if raw_response["x-lxd-type"] == "file"
+        raw_response.body
+      elsif raw_response["x-lxd-type"] == "directory"
+        LxdClient::Response.new(raw_response.code, raw_response.body)
+      end
     end
 
     def container_file_upload(name, local_path, container_path, uid: '0', gid: '0', mode: '644', write: nil)
@@ -153,6 +163,38 @@ module LxdClient
         http.request(post)
       end 
     end
+
+    # def container_file_upload(name, local_path, container_path, uid: '0', gid: '0', mode: '644', write: nil)
+    #   response = request do |http|
+    #     if !File.file?(local_path) 
+    #       raise ArgumentError.new("File #{local_path} not found")
+    #     end
+
+    #     headers = { }
+
+    #     #for streamed uploads, must send Content-Length and Transfer-Encoding as 'chunked'
+    #     headers["Content-Type"] = "application/octet-stream"
+    #     #headers["Content-Length"] = File.stat(local_path).size.to_s
+    #     #headers["Transfer-Encoding"] = 'chunked'
+    #     headers['Content-Encoding'] = 'gzip'
+
+    #     headers["X-LXD-uid"] = uid
+    #     headers["X-LXD-gid"] = gid
+    #     headers["X-LXD-mode"] = mode.rjust(4, '0')
+    #     headers["X-LXD-type"] = 'file'
+    #     headers["X-LXD-write"] = write if !write.nil?
+            
+    #     #must stream file upload: 
+    #     post = Net::HTTP::Post.new("/1.0/containers/#{name}/files?path=#{container_path}", headers)
+        
+    #     gzip = Zlib::GzipWriter.new(StringIO.new)
+    #     gzip << File.read(local_path)
+    #     post.body = gzip.close.string
+    #     #post.body_stream = File.open(local_path, 'r')
+        
+    #     http.request(post)
+    #   end 
+    # end
 
     def container_directory_upload(name, local_path, container_path, uid: '0', gid: '0', mode: '755')
       response = request do |http|
@@ -322,6 +364,11 @@ module LxdClient
       delete("/1.0/networks/#{name}")
     end
 
+    def network_state(name)
+      response = get("/1.0/networks/#{name}/state")
+      response.body["metadata"]
+    end
+
     ############### Operations ###############
 
     def operations
@@ -420,6 +467,15 @@ module LxdClient
       create("/1.0/storage-pools/#{name}/volumes", values_hash)
     end
 
+    def storage_pool_volume(pool, type, name)
+      response = get("/1.0/storage-pools/#{pool}/volumes/#{type}/#{name}")
+      response.body["metadata"]
+    end
+
+    def storage_pool_volume_create(pool, type, values_hash)
+      create("/1.0/storage-pools/#{pool}/volumes/#{type}", values_hash)
+    end
+
     ############### Resources ############### 
 
     def resources
@@ -466,6 +522,53 @@ module LxdClient
         end
       end
     end
+
+    def download_files(container, path, out: '/tmp', compress: false)
+      response = container_file(container, path)
+      
+      if response.kind_of?(LxdClient::Response)
+        filenames = response.body["metadata"]
+        filenames.each do |filename|
+          filepath = File.join(path, filename)
+          
+          subresponse = container_file(container, filepath)
+          if subresponse.kind_of?(String)
+            content = subresponse 
+            outpath = File.join(out, filename)
+            #File.open(outpath, 'w') { |f| f.write(content) }
+
+            Zlib::GzipWriter.open("#{outpath}.gz", Zlib::BEST_COMPRESSION) do |gz|
+              gz.write(content)
+            end
+          end
+        end
+      elsif response.kind_of?(String)
+        content = response
+        #File.open(outpath, 'w') { |f| f.write(content) }
+
+        Zlib::GzipWriter.open("#{outpath}.gz", Zlib::BEST_COMPRESSION) do |gz|
+          gz.write(content)
+        end
+
+      else
+        raise "Unknown response type"
+      end
+    end
+
+    
+    # def compress_file(filepath)
+    #   zipped = "#{filepath}.gz"
+    
+    #   Zlib::GzipWriter.open(zipped, Zlib::BEST_COMPRESSION) do |gz|
+    #     gz.mtime = File.mtime(filepath)
+    #     gz.orig_name = File.basename(filepath)
+    #     File.open(filepath) do |file|
+    #       while chunk = file.read(16*1024) do
+    #         gz.write(chunk)
+    #       end
+    #     end
+    #   end
+    # end
 
     protected
     def container_action(container, action, stateful: false, force: false, timeout: nil)
@@ -594,3 +697,4 @@ module LxdClient
     end
   end
 end
+
