@@ -96,6 +96,10 @@ module LxdClient
     def container_rename(name, new_name)
       rename("/1.0/containers/#{name}", new_name)
     end
+    
+    def container_update(name, values_hash)
+      update("/1.0/containers/#{name}", values_hash)
+    end
 
     def container_delete(name)
       delete("/1.0/containers/#{name}")
@@ -163,38 +167,6 @@ module LxdClient
         http.request(post)
       end 
     end
-
-    # def container_file_upload(name, local_path, container_path, uid: '0', gid: '0', mode: '644', write: nil)
-    #   response = request do |http|
-    #     if !File.file?(local_path) 
-    #       raise ArgumentError.new("File #{local_path} not found")
-    #     end
-
-    #     headers = { }
-
-    #     #for streamed uploads, must send Content-Length and Transfer-Encoding as 'chunked'
-    #     headers["Content-Type"] = "application/octet-stream"
-    #     #headers["Content-Length"] = File.stat(local_path).size.to_s
-    #     #headers["Transfer-Encoding"] = 'chunked'
-    #     headers['Content-Encoding'] = 'gzip'
-
-    #     headers["X-LXD-uid"] = uid
-    #     headers["X-LXD-gid"] = gid
-    #     headers["X-LXD-mode"] = mode.rjust(4, '0')
-    #     headers["X-LXD-type"] = 'file'
-    #     headers["X-LXD-write"] = write if !write.nil?
-            
-    #     #must stream file upload: 
-    #     post = Net::HTTP::Post.new("/1.0/containers/#{name}/files?path=#{container_path}", headers)
-        
-    #     gzip = Zlib::GzipWriter.new(StringIO.new)
-    #     gzip << File.read(local_path)
-    #     post.body = gzip.close.string
-    #     #post.body_stream = File.open(local_path, 'r')
-        
-    #     http.request(post)
-    #   end 
-    # end
 
     def container_directory_upload(name, local_path, container_path, uid: '0', gid: '0', mode: '755')
       response = request do |http|
@@ -656,6 +628,8 @@ module LxdClient
             if LxdClient::Response::ERROR_HTTP_RESPONSE_CODES.include?(operation_status_code.to_s)
               raise(LxdClient::Error.new(operation_response))
             end
+
+            response = operation_response
           end
           response
           
